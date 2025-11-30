@@ -1,0 +1,836 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AidBridge - Donation Platform</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .view {
+            display: none;
+        }
+        .view.active {
+            display: block;
+        }
+        .modal {
+            display: none;
+        }
+        .modal.active {
+            display: flex;
+        }
+        #app-view {
+             display: none;
+        }
+        /* Simple animation for modals */
+        @keyframes fade-in-up {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in-up {
+            animation: fade-in-up 0.3s ease-out forwards;
+        }
+
+        .status-pill {
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .status-pending { background-color: #fef9c3; color: #a16207; }
+        .status-in-transit { background-color: #dbeafe; color: #1e40af; }
+        .status-delivered { background-color: #dcfce7; color: #166534; }
+        .status-active { background-color: #dcfce7; color: #166534; }
+        .status-completed { background-color: #e5e7eb; color: #4b5563; }
+        .status-requested { background-color: #ffedd5; color: #c2410c; }
+
+        /* Toast Notification Styles */
+        #toast-container {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .toast {
+            background-color: #333;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+            animation: slide-in 0.3s ease-out forwards;
+            min-width: 300px;
+        }
+        .toast-success { background-color: #10b981; } /* Green */
+        .toast-info { background-color: #3b82f6; } /* Blue */
+        
+        @keyframes slide-in {
+            from { opacity: 0; transform: translateX(100%); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        @keyframes fade-out {
+            from { opacity: 1; }
+            to { opacity: 0; }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+
+    <!-- Toast Container -->
+    <div id="toast-container"></div>
+
+    <!-- Authentication View -->
+    <div id="auth-view" class="min-h-screen flex items-center justify-center bg-gray-100">
+        <div class="w-full max-w-md">
+            <div class="bg-white shadow-lg rounded-xl p-8">
+                <div class="flex items-center justify-center mb-6">
+                    <i class="fas fa-hands-holding-child text-4xl text-indigo-600"></i>
+                    <h1 class="text-3xl font-bold text-gray-900 ml-3">AidBridge</h1>
+                </div>
+                 <!-- Auth Forms Container -->
+                <div id="auth-forms">
+                    <!-- Login Form -->
+                    <form id="login-form">
+                        <h2 class="text-xl font-semibold text-center mb-4">Welcome Back</h2>
+                        <div class="space-y-4">
+                            <input type="email" placeholder="Email Address" id="login-email" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <input type="password" placeholder="Password" id="login-password" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            
+                            <!-- CAPTCHA for Login -->
+                            <div class="flex flex-col space-y-2 p-3 border rounded-lg bg-indigo-50">
+                                <label for="login-captcha-input" class="text-sm font-medium text-gray-700">Security Check</label>
+                                <div class="flex items-center space-x-3">
+                                    <div id="captcha-display-login" class="px-3 py-1 bg-white border border-indigo-300 rounded-md font-mono text-indigo-800 text-lg font-bold"></div>
+                                    <input type="number" placeholder="Result" id="login-captcha-input" required class="flex-grow px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                    <button type="button" id="refresh-captcha-login" class="text-indigo-600 hover:text-indigo-800"><i class="fas fa-sync-alt"></i></button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="flex justify-end mt-2">
+                             <button type="button" id="show-forgot-password-btn" class="text-sm font-medium text-indigo-600 hover:text-indigo-800 hover:underline">Forgot Password?</button>
+                        </div>
+
+                        <button type="submit" class="w-full mt-4 bg-indigo-600 text-white py-2 rounded-lg font-semibold hover:bg-indigo-700 transition">Login</button>
+                        <p class="text-center text-sm text-gray-600 mt-4">
+                            Don't have an account? <button type="button" id="show-signup-btn" class="font-semibold text-indigo-600 hover:underline">Sign Up</button>
+                        </p>
+                    </form>
+                    
+                    <!-- Signup Form (hidden by default) -->
+                    <form id="signup-form" class="hidden">
+                        <h2 class="text-xl font-semibold text-center mb-4">Create an Account</h2>
+                         <div class="space-y-4">
+                            <input type="email" placeholder="Email Address" id="signup-email" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <input type="password" placeholder="Password" id="signup-password" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                             <select id="signup-role" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                <option value="" disabled selected>Select your role...</option>
+                                <option value="donor">Donor</option>
+                                <option value="recipient">Recipient</option>
+                                <option value="logistics">Logistics Coordinator</option>
+                                <option value="admin">Admin</option>
+                            </select>
+
+                            <!-- CAPTCHA for Signup -->
+                            <div class="flex flex-col space-y-2 p-3 border rounded-lg bg-indigo-50">
+                                <label for="signup-captcha-input" class="text-sm font-medium text-gray-700">Security Check</label>
+                                <div class="flex items-center space-x-3">
+                                    <div id="captcha-display-signup" class="px-3 py-1 bg-white border border-indigo-300 rounded-md font-mono text-indigo-800 text-lg font-bold"></div>
+                                    <input type="number" placeholder="Result" id="signup-captcha-input" required class="flex-grow px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                    <button type="button" id="refresh-captcha-signup" class="text-indigo-600 hover:text-indigo-800"><i class="fas fa-sync-alt"></i></button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <button type="submit" class="w-full mt-6 bg-indigo-600 text-white py-2 rounded-lg font-semibold hover:bg-indigo-700 transition">Sign Up</button>
+                        <p class="text-center text-sm text-gray-600 mt-4">
+                           Already have an account? <button type="button" id="show-login-btn" class="font-semibold text-indigo-600 hover:underline">Login</button>
+                        </p>
+                    </form>
+                </div>
+                 <p id="auth-error" class="text-red-500 text-sm text-center mt-4"></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Application Container -->
+    <div id="app-view">
+        <!-- Header -->
+        <header class="bg-white shadow-sm sticky top-0 z-40">
+            <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex items-center justify-between h-16">
+                    <div class="flex items-center space-x-2">
+                        <i class="fas fa-hands-holding-child text-2xl text-indigo-600"></i>
+                        <h1 class="text-2xl font-bold text-gray-900">AidBridge</h1>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                         <span id="user-info" class="text-sm text-gray-600"></span>
+                         <button id="logout-btn" class="text-sm font-semibold text-indigo-600 hover:text-indigo-800">Logout</button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="container mx-auto p-4 sm:p-6 lg:p-8">
+            <!-- Views will be injected here -->
+            <div id="main-content"></div>
+        </main>
+    </div>
+
+    <!-- Modals -->
+    
+    <!-- Forgot Password Modal -->
+    <div id="forgot-password-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-50 items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-sm p-6 animate-fade-in-up">
+            <h3 class="text-xl font-bold mb-4 text-center">Reset Password</h3>
+            <p class="text-sm text-gray-600 mb-4">Enter your email address to receive a simulated password reset link.</p>
+            <form id="forgot-password-form">
+                <input type="email" placeholder="Your Email Address" id="forgot-email" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <div class="mt-6 flex justify-end space-x-3">
+                    <button type="button" class="modal-close-btn bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-semibold hover:bg-gray-300">Cancel</button>
+                    <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-indigo-700">Send Reset Link</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Donate Item Modal -->
+    <div id="donate-item-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-50 items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-lg p-6 animate-fade-in-up">
+            <h3 class="text-xl font-bold mb-4">Donate Essential Items</h3>
+            <form id="donate-item-form">
+                <div class="space-y-4">
+                    <div>
+                        <label for="donation-category" class="block text-sm font-medium text-gray-700">Category</label>
+                        <select id="donation-category" name="category" required class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
+                            <option>Food</option>
+                            <option>Clothing</option>
+                            <option>Medical Supplies</option>
+                            <option>Hygiene Products</option>
+                            <option>Other</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="donation-description" class="block text-sm font-medium text-gray-700">Item Description</label>
+                        <input type="text" id="donation-description" name="description" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="e.g., Canned beans, T-shirts, Band-aids">
+                    </div>
+                     <div>
+                        <label for="donation-quantity" class="block text-sm font-medium text-gray-700">Quantity</label>
+                        <input type="number" id="donation-quantity" name="quantity" required min="1" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="e.g., 10">
+                    </div>
+                    <div>
+                        <label for="donation-drive-select" class="block text-sm font-medium text-gray-700">Select Drive</label>
+                        <select id="donation-drive-select" name="driveId" required class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
+                        </select>
+                    </div>
+                </div>
+                <div class="mt-6 flex justify-end space-x-3">
+                    <button type="button" class="modal-close-btn bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-semibold hover:bg-gray-300">Cancel</button>
+                    <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-indigo-700">Submit Donation</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Request Item Modal -->
+    <div id="request-item-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-50 items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-lg p-6 animate-fade-in-up">
+            <h3 class="text-xl font-bold mb-4">Request Essential Items</h3>
+            <form id="request-item-form">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Category</label>
+                        <select id="request-category" name="category" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
+                            <option>Food</option> <option>Clothing</option> <option>Medical Supplies</option> <option>Hygiene Products</option> <option>Other</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Item Description</label>
+                        <input type="text" id="request-description" name="description" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500" placeholder="e.g. Warm Blankets">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Quantity</label>
+                        <input type="number" id="request-quantity" name="quantity" required min="1" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500" placeholder="1">
+                    </div>
+                </div>
+                <div class="mt-6 flex justify-end space-x-3">
+                    <button type="button" class="modal-close-btn bg-gray-200 px-4 py-2 rounded-lg font-semibold">Cancel</button>
+                    <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-green-700">Submit Request</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Create Drive Modal -->
+    <div id="create-drive-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-50 items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-lg p-6 animate-fade-in-up">
+            <h3 class="text-xl font-bold mb-4">Create New Donation Drive</h3>
+            <form id="create-drive-form">
+                <div class="space-y-4">
+                    <input type="text" id="drive-name" name="name" required class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="Drive Name">
+                    <textarea id="drive-description" name="description" required rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="Description"></textarea>
+                    <input type="number" id="drive-goal" name="goal" required min="1" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="Goal (Number of Items)">
+                </div>
+                <div class="mt-6 flex justify-end space-x-3">
+                    <button type="button" class="modal-close-btn bg-gray-200 px-4 py-2 rounded-lg font-semibold">Cancel</button>
+                    <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-indigo-700">Create Drive</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- DATA STORE (Simulated Database) ---
+            let data = {
+                users: [
+                    { id: 'admin1', email: 'admin@aid.com', password: 'password', role: 'admin' },
+                    { id: 'donor1', email: 'donor@aid.com', password: 'password', role: 'donor' },
+                    { id: 'recipient1', email: 'recipient@aid.com', password: 'password', role: 'recipient' },
+                    { id: 'logistics1', email: 'logistics@aid.com', password: 'password', role: 'logistics' },
+                ],
+                drives: [
+                    { id: 1, name: "Flood Relief Essentials", description: "Collecting non-perishable food, clean water, and blankets for flood victims.", goal: 1000, collected: 450, status: 'active' },
+                    { id: 2, name: "Back to School Drive", description: "Providing school supplies for children in low-income families.", goal: 500, collected: 520, status: 'completed' }
+                ],
+                donations: [
+                    { id: 1, userId: 'donor1', driveId: 1, category: 'Food', description: 'Canned Soups', quantity: 24, status: 'delivered' },
+                    { id: 2, userId: 'donor2', driveId: 1, category: 'Clothing', description: 'Winter Jackets', quantity: 10, status: 'in-transit' },
+                ],
+                requests: [
+                    { id: 1, userId: 'recipient1', category: 'Food', description: 'Baby Formula', quantity: 3, status: 'in-transit' },
+                ],
+                // NEW: Inbox for simulated emails
+                messages: [
+                    { id: 1, from: 'system@aid.com', subject: 'Welcome', body: 'Welcome to the AidBridge Admin panel.', date: '2023-10-25' }
+                ],
+            };
+            
+            // Stores the correct CAPTCHA answers
+            let captchaAnswers = {
+                'login': null,
+                'signup': null
+            };
+
+            let currentUser = null;
+
+            // --- UI ELEMENT SELECTORS ---
+            const authView = document.getElementById('auth-view');
+            const appView = document.getElementById('app-view');
+            const loginForm = document.getElementById('login-form');
+            const signupForm = document.getElementById('signup-form');
+            const showSignupBtn = document.getElementById('show-signup-btn');
+            const showLoginBtn = document.getElementById('show-login-btn');
+            const showForgotPwdBtn = document.getElementById('show-forgot-password-btn');
+            const authError = document.getElementById('auth-error');
+            const mainContent = document.getElementById('main-content');
+            const userInfo = document.getElementById('user-info');
+            const logoutBtn = document.getElementById('logout-btn');
+            const toastContainer = document.getElementById('toast-container');
+            const forgotPasswordModal = document.getElementById('forgot-password-modal');
+            const forgotPasswordForm = document.getElementById('forgot-password-form');
+            const refreshCaptchaLoginBtn = document.getElementById('refresh-captcha-login');
+            const refreshCaptchaSignupBtn = document.getElementById('refresh-captcha-signup');
+
+            // --- CAPTCHA LOGIC ---
+            function generateCaptcha() {
+                const num1 = Math.floor(Math.random() * 10) + 1; // 1 to 10
+                const num2 = Math.floor(Math.random() * 5) + 1;  // 1 to 5
+                const operation = '+'; // Keep it simple
+                const question = `${num1} ${operation} ${num2}`;
+                const answer = num1 + num2;
+                return { question, answer };
+            }
+
+            function refreshCaptcha(formType) {
+                const { question, answer } = generateCaptcha();
+                captchaAnswers[formType] = answer;
+                document.getElementById(`captcha-display-${formType}`).textContent = question + ' = ?';
+                document.getElementById(`${formType}-captcha-input`).value = '';
+                authError.textContent = ''; // Clear previous error
+            }
+
+            function validateCaptcha(formType) {
+                const inputElement = document.getElementById(`${formType}-captcha-input`);
+                const userInput = parseInt(inputElement.value.trim());
+                const correctAnswer = captchaAnswers[formType];
+                
+                if (userInput === correctAnswer) {
+                    return true;
+                } else {
+                    authError.textContent = 'CAPTCHA failed. Please try again.';
+                    refreshCaptcha(formType);
+                    return false;
+                }
+            }
+
+            // Initial CAPTCHA setup
+            refreshCaptcha('login');
+            refreshCaptcha('signup');
+
+            // Refresh buttons setup
+            refreshCaptchaLoginBtn.addEventListener('click', () => refreshCaptcha('login'));
+            refreshCaptchaSignupBtn.addEventListener('click', () => refreshCaptcha('signup'));
+
+            // --- MODAL & TOAST HANDLERS ---
+            function openModal(modalId) { document.getElementById(modalId).classList.add('active'); }
+            function closeModal(modalId) { document.getElementById(modalId).classList.remove('active'); }
+
+            function showToast(message, type = 'success') {
+                const toast = document.createElement('div');
+                toast.className = `toast ${type === 'success' ? 'toast-success' : 'toast-info'}`;
+                
+                const icon = type === 'success' ? '<i class="fas fa-check-circle mr-3"></i>' : '<i class="fas fa-envelope mr-3"></i>';
+                
+                toast.innerHTML = `
+                    ${icon}
+                    <div>
+                        <p class="font-semibold">${message}</p>
+                    </div>
+                `;
+                
+                toastContainer.appendChild(toast);
+                
+                // Remove toast after 4 seconds
+                setTimeout(() => {
+                    toast.style.animation = 'fade-out 0.5s ease-out forwards';
+                    setTimeout(() => toast.remove(), 500);
+                }, 4000);
+            }
+
+            function simulateEmail(to, subject, body) {
+                // 1. Add visual feedback (Toast)
+                showToast(`Email confirmation sent to ${to}`, 'info');
+
+                // 2. Add to backend "Messages" list (Simulating an email server receiving the mail)
+                const newMessage = {
+                    id: Date.now(),
+                    from: currentUser ? currentUser.email : 'system-auth', // Can be used for unauthenticated users too
+                    subject: subject,
+                    body: body,
+                    date: new Date().toLocaleDateString()
+                };
+                // Prepend to messages array so newest is first
+                data.messages.unshift(newMessage);
+            }
+
+
+            // --- AUTHENTICATION LOGIC ---
+            function switchAuthForm(show) {
+                authError.textContent = '';
+                if (show === 'signup') {
+                    loginForm.classList.add('hidden');
+                    signupForm.classList.remove('hidden');
+                    refreshCaptcha('signup');
+                } else {
+                    signupForm.classList.add('hidden');
+                    loginForm.classList.remove('hidden');
+                    refreshCaptcha('login');
+                }
+            }
+
+            showSignupBtn.addEventListener('click', () => switchAuthForm('signup'));
+            showLoginBtn.addEventListener('click', () => switchAuthForm('login'));
+            showForgotPwdBtn.addEventListener('click', () => openModal('forgot-password-modal'));
+
+
+            loginForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                authError.textContent = ''; // Clear previous error
+                
+                if (!validateCaptcha('login')) return; // CAPTCHA Check
+
+                const email = document.getElementById('login-email').value;
+                const password = document.getElementById('login-password').value;
+                const user = data.users.find(u => u.email === email && u.password === password);
+                
+                if (user) {
+                    currentUser = user;
+                    initializeApp();
+                } else {
+                    authError.textContent = 'Invalid email or password.';
+                    refreshCaptcha('login'); // Refresh CAPTCHA on login failure
+                }
+            });
+
+            signupForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                authError.textContent = ''; // Clear previous error
+
+                 if (!validateCaptcha('signup')) return; // CAPTCHA Check
+
+                const email = document.getElementById('signup-email').value;
+                const password = document.getElementById('signup-password').value;
+                const role = document.getElementById('signup-role').value;
+
+                if (data.users.find(u => u.email === email)) {
+                    authError.textContent = 'User with this email already exists.';
+                    refreshCaptcha('signup'); // Refresh CAPTCHA
+                    return;
+                }
+
+                const newUser = { id: `user_${Date.now()}`, email, password, role };
+                data.users.push(newUser);
+                currentUser = newUser;
+                initializeApp();
+            });
+            
+            forgotPasswordForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const email = document.getElementById('forgot-email').value;
+                const userExists = data.users.find(u => u.email === email);
+                
+                if (userExists) {
+                    // Simulate sending a password reset link
+                    simulateEmail(
+                        email, 
+                        'Password Reset Request (Simulated)', 
+                        `A request to reset the password for ${email} was received. Since this is a demo, we are only logging this action.`
+                    );
+                    showToast('If your account exists, a reset link has been simulated!', 'info');
+                } else {
+                    // Send a non-committal message for security (don't reveal if email exists)
+                    showToast('If your account exists, a reset link has been simulated!', 'info');
+                }
+
+                document.getElementById('forgot-email').value = '';
+                closeModal('forgot-password-modal');
+                refreshCaptcha('login'); // Refresh login CAPTCHA after attempt
+            });
+
+
+            logoutBtn.addEventListener('click', () => {
+                currentUser = null;
+                appView.style.display = 'none';
+                authView.style.display = 'flex';
+                mainContent.innerHTML = '';
+                refreshCaptcha('login'); // Reset CAPTCHA when logging out
+            });
+
+            // --- APP INITIALIZATION ---
+            function initializeApp() {
+                authView.style.display = 'none';
+                appView.style.display = 'block';
+                userInfo.textContent = `Logged in as ${currentUser.email} (${currentUser.role})`;
+                renderViewForRole(currentUser.role);
+            }
+
+            // --- RENDER FUNCTIONS FOR DYNAMIC CONTENT (Unchanged) ---
+            function renderViewForRole(role) {
+                const viewTemplates = {
+                    donor: `
+                        <div id="donor-view" class="view active">
+                            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                                <div class="lg:col-span-2">
+                                    <div class="bg-white p-6 rounded-lg shadow-md">
+                                        <div class="flex justify-between items-center mb-4">
+                                            <h2 class="text-xl font-semibold">Active Donation Drives</h2>
+                                            <button id="donate-now-btn" class="bg-indigo-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-indigo-700 transition duration-200 shadow"><i class="fas fa-plus mr-2"></i>Donate Items</button>
+                                        </div>
+                                        <div id="donor-drives-list" class="space-y-4"></div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="bg-white p-6 rounded-lg shadow-md">
+                                        <h2 class="text-xl font-semibold mb-4">My Donations</h2>
+                                        <div id="my-donations-list" class="space-y-4"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>`,
+                    recipient: `
+                        <div id="recipient-view" class="view active">
+                             <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                                <div class="lg:col-span-2">
+                                    <div class="bg-white p-6 rounded-lg shadow-md">
+                                        <div class="flex justify-between items-center mb-4">
+                                            <h2 class="text-xl font-semibold">Available Essentials</h2>
+                                            <button id="request-item-btn" class="bg-green-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-green-700 transition duration-200 shadow"><i class="fas fa-hand-holding-heart mr-2"></i>Request Item</button>
+                                        </div>
+                                        <div id="available-items-list" class="space-y-4"></div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="bg-white p-6 rounded-lg shadow-md">
+                                        <h2 class="text-xl font-semibold mb-4">My Requests</h2>
+                                        <div id="my-requests-list" class="space-y-4"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>`,
+                    logistics: `
+                        <div id="logistics-view" class="view active">
+                            <div class="bg-white p-6 rounded-lg shadow-md">
+                                <h2 class="text-2xl font-bold mb-6">Logistics Dashboard</h2>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                    <div><h3 class="text-lg font-semibold mb-4 border-b pb-2">Pending Pickups</h3><div id="pending-pickups-list" class="space-y-3"></div></div>
+                                    <div><h3 class="text-lg font-semibold mb-4 border-b pb-2">Pending Deliveries</h3><div id="pending-deliveries-list" class="space-y-3"></div></div>
+                                </div>
+                            </div>
+                        </div>`,
+                    admin: `
+                        <div id="admin-view" class="view active">
+                            <div class="bg-white p-6 rounded-lg shadow-md mb-8">
+                                <div class="flex justify-between items-center mb-6">
+                                    <h2 class="text-2xl font-bold">Admin Dashboard</h2>
+                                    <button id="create-drive-btn" class="bg-indigo-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-indigo-700 transition duration-200 shadow"><i class="fas fa-plus-circle mr-2"></i>Create New Drive</button>
+                                </div>
+                                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    <div class="bg-gray-100 p-4 rounded-lg"><h3 class="font-semibold">Total Drives</h3><p id="admin-stat-drives" class="text-2xl font-bold"></p></div>
+                                    <div class="bg-gray-100 p-4 rounded-lg"><h3 class="font-semibold">Total Donations</h3><p id="admin-stat-donations" class="text-2xl font-bold"></p></div>
+                                    <div class="bg-gray-100 p-4 rounded-lg"><h3 class="font-semibold">Total Users</h3><p id="admin-stat-users" class="text-2xl font-bold"></p></div>
+                                </div>
+                            </div>
+                            
+                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                <div class="bg-white p-6 rounded-lg shadow-md">
+                                    <h3 class="text-lg font-semibold mb-4 border-b pb-2">Manage Donation Drives</h3>
+                                    <div id="admin-drives-management-list" class="space-y-4"></div>
+                                </div>
+                                <div class="bg-white p-6 rounded-lg shadow-md">
+                                    <div class="flex justify-between items-center mb-4 border-b pb-2">
+                                        <h3 class="text-lg font-semibold">Inbox (Messages)</h3>
+                                        <span class="text-xs bg-red-100 text-red-600 px-2 py-1 rounded-full font-bold">Simulated Email Server</span>
+                                    </div>
+                                    <div id="admin-messages-list" class="space-y-3 h-64 overflow-y-auto"></div>
+                                </div>
+                            </div>
+                        </div>`
+                };
+
+                mainContent.innerHTML = viewTemplates[role] || '<p>Invalid role assigned.</p>';
+                renderAllDynamicContent();
+            }
+
+            function renderAllDynamicContent() {
+                if (!currentUser) return;
+                
+                const role = currentUser.role;
+                if (role === 'donor') renderDonorView();
+                if (role === 'recipient') renderRecipientView();
+                if (role === 'logistics') renderLogisticsView();
+                if (role === 'admin') renderAdminView();
+                
+                setupActionButtons();
+            }
+
+            function renderDonorView() {
+                const drivesList = document.getElementById('donor-drives-list');
+                const myDonationsList = document.getElementById('my-donations-list');
+                const driveSelect = document.getElementById('donation-drive-select');
+                
+                drivesList.innerHTML = '';
+                myDonationsList.innerHTML = '';
+                driveSelect.innerHTML = '';
+
+                data.drives.filter(d => d.status === 'active').forEach(drive => {
+                    const progress = Math.min((drive.collected / drive.goal) * 100, 100);
+                    drivesList.innerHTML += `<div class="border rounded-lg p-4 bg-gray-50"><h4 class="font-bold text-lg">${drive.name}</h4><p class="text-sm text-gray-600 mb-2">${drive.description}</p><div class="w-full bg-gray-200 rounded-full h-2.5"><div class="bg-indigo-600 h-2.5 rounded-full" style="width: ${progress}%"></div></div><p class="text-sm text-right mt-1">${drive.collected} / ${drive.goal} items</p></div>`;
+                    driveSelect.innerHTML += `<option value="${drive.id}">${drive.name}</option>`;
+                });
+                
+                data.donations.filter(d => d.userId === currentUser.id).forEach(donation => {
+                     myDonationsList.innerHTML += `<div class="flex justify-between items-center text-sm border-b pb-2"><div><p class="font-semibold">${donation.quantity}x ${donation.description}</p><p class="text-xs text-gray-500">${donation.category}</p></div><span class="status-pill status-${donation.status.replace('-','')}">${donation.status}</span></div>`;
+                });
+            }
+
+            function renderRecipientView() {
+                const availableList = document.getElementById('available-items-list');
+                const myRequestsList = document.getElementById('my-requests-list');
+                
+                availableList.innerHTML = '';
+                myRequestsList.innerHTML = '';
+                
+                const inventory = {};
+                data.donations.filter(d => d.status === 'delivered').forEach(item => {
+                    if(inventory[item.description]) {
+                        inventory[item.description].quantity += item.quantity;
+                    } else {
+                        inventory[item.description] = {...item};
+                    }
+                });
+                
+                if (Object.keys(inventory).length === 0) {
+                     availableList.innerHTML = `<p class="text-gray-500">No items currently available in inventory.</p>`;
+                } else {
+                    Object.values(inventory).forEach(item => {
+                        availableList.innerHTML += `<div class="border rounded-lg p-3 flex justify-between items-center"><div><h4 class="font-semibold">${item.description}</h4><p class="text-sm text-gray-600">${item.category}</p></div><span class="text-lg font-bold text-indigo-600">${item.quantity} available</span></div>`;
+                    });
+                }
+                
+                data.requests.filter(r => r.userId === currentUser.id).forEach(req => {
+                    myRequestsList.innerHTML += `<div class="flex justify-between items-center text-sm border-b pb-2"><div><p class="font-semibold">${req.quantity}x ${req.description}</p><p class="text-xs text-gray-500">${req.category}</p></div><span class="status-pill status-${req.status.replace('-','')}">${req.status}</span></div>`;
+                });
+            }
+
+            function renderLogisticsView() {
+                const pickupsList = document.getElementById('pending-pickups-list');
+                const deliveriesList = document.getElementById('pending-deliveries-list');
+
+                pickupsList.innerHTML = '';
+                deliveriesList.innerHTML = '';
+
+                data.donations.filter(d => d.status === 'pending').forEach(item => {
+                    pickupsList.innerHTML += `<div class="bg-gray-50 p-3 rounded-lg flex justify-between items-center"><div><p class="font-semibold">${item.quantity}x ${item.description}</p><p class="text-sm text-gray-500">From Donor: ${item.userId}</p></div><button data-id="${item.id}" class="pickup-btn bg-blue-500 text-white px-3 py-1 rounded-md text-sm hover:bg-blue-600">Mark In-Transit</button></div>`;
+                });
+                
+                const deliveries = data.donations.filter(d => d.status === 'in-transit').concat(data.requests.filter(r => r.status === 'requested' || r.status === 'in-transit'));
+                deliveries.forEach(item => {
+                    let actionButton = '';
+                    let targetUser = '';
+                    if (item.driveId) { // It's a donation
+                        targetUser = `Warehouse`;
+                        actionButton = `<button data-id="${item.id}" class="complete-pickup-btn bg-green-500 text-white px-3 py-1 rounded-md text-sm hover:bg-green-600">Mark Delivered</button>`;
+                    } else { // It's a request
+                        targetUser = `Recipient: ${item.userId}`;
+                         if(item.status === 'requested') {
+                           actionButton = `<button data-id="${item.id}" class="assign-delivery-btn bg-yellow-500 text-white px-3 py-1 rounded-md text-sm hover:bg-yellow-600">Assign for Delivery</button>`;
+                        } else { // in-transit
+                           actionButton = `<button data-id="${item.id}" class="complete-delivery-btn bg-green-500 text-white px-3 py-1 rounded-md text-sm hover:bg-green-600">Mark Delivered</button>`;
+                        }
+                    }
+                     deliveriesList.innerHTML += `<div class="bg-gray-50 p-3 rounded-lg flex justify-between items-center"><div><p class="font-semibold">${item.quantity}x ${item.description}</p><p class="text-sm text-gray-500">To: ${targetUser} | <span class="font-bold uppercase">${item.status}</span></p></div>${actionButton}</div>`;
+                });
+            }
+            
+            function renderAdminView() {
+                 document.getElementById('admin-stat-drives').textContent = data.drives.length;
+                 document.getElementById('admin-stat-donations').textContent = data.donations.length;
+                 document.getElementById('admin-stat-users').textContent = data.users.length;
+                 
+                 const drivesList = document.getElementById('admin-drives-management-list');
+                 drivesList.innerHTML = '';
+                 data.drives.forEach(drive => {
+                     drivesList.innerHTML += `<div class="border rounded-lg p-4 flex justify-between items-center"><div><h4 class="font-bold text-lg">${drive.name}</h4><p class="text-sm text-gray-600">${drive.description}</p><p class="text-sm mt-1">Goal: ${drive.collected}/${drive.goal}</p></div><div><span class="status-pill ${drive.status === 'active' ? 'status-active' : 'status-completed'}">${drive.status}</span>${drive.status === 'active' ? `<button data-id="${drive.id}" class="mark-complete-btn ml-2 bg-red-500 text-white px-3 py-1 rounded-md text-sm hover:bg-red-600">End Drive</button>` : ''}</div></div>`;
+                 });
+
+                 // Render Messages Inbox
+                 const messagesList = document.getElementById('admin-messages-list');
+                 messagesList.innerHTML = '';
+                 data.messages.forEach(msg => {
+                    messagesList.innerHTML += `
+                        <div class="border-l-4 border-indigo-500 bg-gray-50 p-3 rounded shadow-sm">
+                            <div class="flex justify-between">
+                                <span class="font-bold text-sm text-indigo-700">${msg.from}</span>
+                                <span class="text-xs text-gray-500">${msg.date}</span>
+                            </div>
+                            <div class="font-semibold text-sm mt-1">${msg.subject}</div>
+                            <div class="text-xs text-gray-600 mt-1">${msg.body}</div>
+                        </div>
+                    `;
+                 });
+                 if(data.messages.length === 0) messagesList.innerHTML = '<p class="text-sm text-gray-500 italic">No new messages.</p>';
+            }
+
+            // --- EVENT LISTENERS & ACTIONS ---
+            function setupActionButtons() {
+                document.body.addEventListener('click', e => {
+                    // Modal Openers
+                    if (e.target.id === 'donate-now-btn') openModal('donate-item-modal');
+                    if (e.target.id === 'request-item-btn') openModal('request-item-modal');
+                    if (e.target.id === 'create-drive-btn') openModal('create-drive-modal');
+
+                    // Modal Closers
+                    if (e.target.classList.contains('modal-close-btn') || e.target.classList.contains('modal')) {
+                        document.querySelectorAll('.modal').forEach(m => m.classList.remove('active'));
+                    }
+
+                    // Logistics Actions
+                    const logisticsView = document.getElementById('logistics-view');
+                    if (logisticsView && logisticsView.contains(e.target)) {
+                        if (e.target.classList.contains('pickup-btn')) updateItemStatus('donations', e.target.dataset.id, 'in-transit');
+                        if (e.target.classList.contains('complete-pickup-btn')) updateItemStatus('donations', e.target.dataset.id, 'delivered');
+                        if (e.target.classList.contains('assign-delivery-btn')) updateItemStatus('requests', e.target.dataset.id, 'in-transit');
+                        if (e.target.classList.contains('complete-delivery-btn')) updateItemStatus('requests', e.target.dataset.id, 'delivered');
+                    }
+                    
+                    // Admin Actions
+                    const adminView = document.getElementById('admin-view');
+                    if(adminView && adminView.contains(e.target) && e.target.classList.contains('mark-complete-btn')) {
+                       updateItemStatus('drives', e.target.dataset.id, 'completed');
+                    }
+                });
+            }
+            
+            function updateItemStatus(itemType, id, newStatus) {
+                const item = data[itemType].find(i => i.id == id);
+                if (item) {
+                    item.status = newStatus;
+                    showToast(`Status updated to ${newStatus}`, 'success');
+                }
+                renderAllDynamicContent();
+            }
+
+            // Form Submissions
+            document.getElementById('donate-item-form').addEventListener('submit', e => {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                const newDonation = { id: Date.now(), userId: currentUser.id, driveId: parseInt(formData.get('driveId')), category: formData.get('category'), description: formData.get('description'), quantity: parseInt(formData.get('quantity')), status: 'pending' };
+                data.donations.push(newDonation);
+                
+                const drive = data.drives.find(d => d.id === newDonation.driveId);
+                if(drive) drive.collected += newDonation.quantity;
+                
+                e.target.reset();
+                closeModal('donate-item-modal');
+                
+                // Show Success Toast
+                showToast('Donation submitted successfully!', 'success');
+                renderAllDynamicContent();
+            });
+
+             document.getElementById('request-item-form').addEventListener('submit', e => {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                const desc = formData.get('description');
+                const qty = formData.get('quantity');
+
+                const newRequest = { 
+                    id: Date.now(), 
+                    userId: currentUser.id, 
+                    category: formData.get('category'), 
+                    description: desc, 
+                    quantity: parseInt(qty), 
+                    status: 'requested' 
+                };
+                data.requests.push(newRequest);
+                
+                e.target.reset();
+                closeModal('request-item-modal');
+
+                // --- NEW: SEND EMAIL SIMULATION ---
+                simulateEmail(
+                    currentUser.email, 
+                    `New Request: ${desc}`, 
+                    `User ${currentUser.email} requested ${qty}x ${desc}.`
+                );
+
+                renderAllDynamicContent();
+            });
+            
+            document.getElementById('create-drive-form').addEventListener('submit', e => {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                const newDrive = { id: Date.now(), name: formData.get('name'), description: formData.get('description'), goal: parseInt(formData.get('goal')), collected: 0, status: 'active' };
+                data.drives.push(newDrive);
+                e.target.reset();
+                closeModal('create-drive-modal');
+                
+                showToast('New Drive created!', 'success');
+                renderAllDynamicContent();
+            });
+
+        });
+    </script>
+</body>
+</html>
