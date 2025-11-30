@@ -1,0 +1,731 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  Users, Package, Truck, Heart, LayoutDashboard, 
+  LogOut, MapPin, Bell, Search, Plus, 
+  ChevronRight, Star, Mail, Phone, HelpCircle,
+  Menu, X, Facebook, Twitter, Github, CheckCircle, AlertCircle
+} from 'lucide-react';
+
+// --- Configuration & Constants ---
+const BRAND_COLOR = '#4567b7';
+const BRAND_LIGHT = '#f7f7f7';
+
+// --- Mock Data ---
+const INITIAL_DATA = {
+  users: [
+    { id: 'u1', name: 'Admin User', email: 'admin@help.com', role: 'admin', password: '123' },
+    { id: 'u2', name: 'John Doe', email: 'donor@help.com', role: 'donor', password: '123' },
+    { id: 'u3', name: 'Jane Smith', email: 'recipient@help.com', role: 'recipient', password: '123' },
+    { id: 'u4', name: 'Logistics Pro', email: 'logistics@help.com', role: 'logistics', password: '123' },
+  ],
+  drives: [
+    { id: 1, title: 'Winter Warmth Drive', target: 500, current: 320, category: 'Clothing', urgency: 'Normal' },
+    { id: 2, title: 'Flood Relief Emergency', target: 2000, current: 450, category: 'Mixed', urgency: 'High' },
+  ],
+  requests: [
+    { id: 101, user: 'Jane Smith', item: 'Baby Formula', category: 'Food', status: 'Pending', date: '2023-10-25' },
+    { id: 102, user: 'Mark T.', item: 'Insulin', category: 'Medical', status: 'In Transit', date: '2023-10-26' },
+    { id: 103, user: 'Sarah L.', item: 'Winter Jacket', category: 'Clothing', status: 'Delivered', date: '2023-10-20' },
+  ],
+  notifications: [
+    { id: 1, text: "New emergency drive started: Flood Relief", type: "info" }
+  ]
+};
+
+// --- Helper Components ---
+
+const Button = ({ children, onClick, variant = 'primary', className = '', ...props }) => {
+  const baseStyle = "px-4 py-2 rounded-lg font-medium transition-all duration-200 flex items-center justify-center gap-2";
+  const variants = {
+    primary: `bg-[#4567b7] text-white hover:bg-[#345196] shadow-md hover:shadow-lg`,
+    secondary: `bg-white text-[#4567b7] border border-[#4567b7] hover:bg-blue-50`,
+    outline: `border border-gray-300 text-gray-600 hover:bg-gray-50`,
+    ghost: `text-gray-600 hover:bg-gray-100`,
+    danger: `bg-red-50 text-red-600 hover:bg-red-100`
+  };
+  return (
+    <button onClick={onClick} className={`${baseStyle} ${variants[variant]} ${className}`} {...props}>
+      {children}
+    </button>
+  );
+};
+
+const Card = ({ children, className = '' }) => (
+  <div className={`bg-white rounded-xl shadow-sm border border-gray-100 p-6 ${className}`}>
+    {children}
+  </div>
+);
+
+const Badge = ({ status }) => {
+  const styles = {
+    'Pending': 'bg-yellow-100 text-yellow-700',
+    'In Transit': 'bg-blue-100 text-blue-700',
+    'Delivered': 'bg-green-100 text-green-700',
+    'High': 'bg-red-100 text-red-700',
+    'Normal': 'bg-gray-100 text-gray-700',
+  };
+  return (
+    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${styles[status] || 'bg-gray-100 text-gray-600'}`}>
+      {status}
+    </span>
+  );
+};
+
+// --- Main Application Component ---
+
+export default function App() {
+  const [currentPage, setCurrentPage] = useState('home');
+  const [user, setUser] = useState(null); // Authenticated user
+  const [data, setData] = useState(INITIAL_DATA);
+  const [toasts, setToasts] = useState([]);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // --- Actions ---
+
+  const addToast = (message, type = 'success') => {
+    const id = Date.now();
+    setToasts(prev => [...prev, { id, message, type }]);
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3000);
+  };
+
+  const handleLogin = (email, password) => {
+    const foundUser = data.users.find(u => u.email === email && u.password === password);
+    if (foundUser) {
+      setUser(foundUser);
+      setCurrentPage(`dashboard-${foundUser.role}`);
+      addToast(`Welcome back, ${foundUser.name}!`);
+    } else {
+      addToast('Invalid credentials', 'error');
+    }
+  };
+
+  const handleSignup = (newUser) => {
+    setData(prev => ({ ...prev, users: [...prev.users, { ...newUser, id: Date.now() }] }));
+    setUser(newUser);
+    setCurrentPage(`dashboard-${newUser.role}`);
+    addToast('Account created successfully!');
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+    setCurrentPage('home');
+    addToast('Logged out successfully', 'info');
+  };
+
+  // --- Views ---
+
+  const Navbar = () => (
+    <nav className="bg-white shadow-sm sticky top-0 z-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex justify-between h-16 items-center">
+          <div className="flex items-center cursor-pointer" onClick={() => !user ? setCurrentPage('home') : setCurrentPage(`dashboard-${user.role}`)}>
+            <div className="w-8 h-8 rounded bg-[#4567b7] flex items-center justify-center mr-2">
+              <Heart className="w-5 h-5 text-white" fill="white" />
+            </div>
+            <span className="font-bold text-xl text-gray-800 tracking-tight">HelpHands</span>
+          </div>
+
+          {/* Desktop Nav */}
+          <div className="hidden md:flex items-center space-x-6">
+            {!user ? (
+              <>
+                <button onClick={() => setCurrentPage('home')} className="text-gray-600 hover:text-[#4567b7]">Home</button>
+                <button onClick={() => setCurrentPage('about')} className="text-gray-600 hover:text-[#4567b7]">About Us</button>
+                <button onClick={() => setCurrentPage('login')} className="text-[#4567b7] font-medium">Login</button>
+                <Button onClick={() => setCurrentPage('signup')}>Sign Up</Button>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-[#4567b7] font-bold">
+                    {user.name[0]}
+                  </div>
+                  <span className="text-sm font-medium">{user.name}</span>
+                </div>
+                <Button variant="ghost" onClick={handleLogout}><LogOut className="w-4 h-4" /></Button>
+              </>
+            )}
+          </div>
+
+          {/* Mobile Menu Button */}
+          <div className="md:hidden">
+            <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="text-gray-600">
+              {mobileMenuOpen ? <X /> : <Menu />}
+            </button>
+          </div>
+        </div>
+      </div>
+      {/* Mobile Menu */}
+      {mobileMenuOpen && (
+        <div className="md:hidden bg-white border-t border-gray-100 p-4 space-y-2">
+          {!user ? (
+            <>
+              <button onClick={() => { setCurrentPage('home'); setMobileMenuOpen(false); }} className="block w-full text-left py-2">Home</button>
+              <button onClick={() => { setCurrentPage('login'); setMobileMenuOpen(false); }} className="block w-full text-left py-2">Login</button>
+              <button onClick={() => { setCurrentPage('signup'); setMobileMenuOpen(false); }} className="block w-full text-left py-2 text-[#4567b7] font-bold">Sign Up</button>
+            </>
+          ) : (
+             <button onClick={() => { handleLogout(); setMobileMenuOpen(false); }} className="block w-full text-left py-2 text-red-600">Logout</button>
+          )}
+        </div>
+      )}
+    </nav>
+  );
+
+  const LandingPage = () => (
+    <div className="min-h-screen bg-[#f7f7f7]">
+      {/* Hero Section */}
+      <div className="relative bg-[#4567b7] text-white overflow-hidden">
+        <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
+        <div className="max-w-7xl mx-auto px-4 py-24 sm:px-6 lg:px-8 relative z-10 flex flex-col md:flex-row items-center">
+          <div className="md:w-1/2 mb-10 md:mb-0">
+            <h1 className="text-4xl md:text-6xl font-bold leading-tight mb-6">
+              Extending a helping hand in times of need.
+            </h1>
+            <p className="text-blue-100 text-lg mb-8 max-w-lg">
+              HelpHands connects generous donors with people in need. Join our community to coordinate logistics, donate essentials, or request support today.
+            </p>
+            <div className="flex gap-4">
+              <Button onClick={() => setCurrentPage('signup')} className="bg-white text-[#4567b7] hover:bg-blue-50 px-8 py-3 text-lg">
+                Get Started
+              </Button>
+              <Button variant="outline" className="border-white text-white hover:bg-white/10 px-8 py-3 text-lg">
+                Learn More
+              </Button>
+            </div>
+          </div>
+          <div className="md:w-1/2 flex justify-center">
+            {/* Abstract Illustration */}
+            <div className="relative w-80 h-80">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-blue-400 rounded-full opacity-20 animate-pulse"></div>
+                <div className="absolute bottom-0 left-10 w-48 h-48 bg-blue-300 rounded-full opacity-20"></div>
+                <Heart className="w-full h-full text-white drop-shadow-2xl" fill="rgba(255,255,255,0.2)" strokeWidth={1} />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Stats Section */}
+      <div className="max-w-7xl mx-auto px-4 py-12 -mt-16 relative z-20">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <Card className="flex items-center gap-4">
+            <div className="p-3 bg-blue-100 rounded-lg text-[#4567b7]"><Package className="w-6 h-6" /></div>
+            <div><p className="text-2xl font-bold">12,500+</p><p className="text-gray-500">Items Donated</p></div>
+          </Card>
+          <Card className="flex items-center gap-4">
+            <div className="p-3 bg-green-100 rounded-lg text-green-600"><Users className="w-6 h-6" /></div>
+            <div><p className="text-2xl font-bold">8,200+</p><p className="text-gray-500">People Helped</p></div>
+          </Card>
+          <Card className="flex items-center gap-4">
+            <div className="p-3 bg-orange-100 rounded-lg text-orange-600"><Truck className="w-6 h-6" /></div>
+            <div><p className="text-2xl font-bold">150+</p><p className="text-gray-500">Active Drives</p></div>
+          </Card>
+        </div>
+      </div>
+
+      {/* Features Grid */}
+      <div className="max-w-7xl mx-auto px-4 py-16">
+        <h2 className="text-3xl font-bold text-center text-gray-800 mb-12">How We Help</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+          {[
+            { icon: Heart, title: 'Donors', desc: 'Easily list items and track your impact.' },
+            { icon: Users, title: 'Recipients', desc: 'Request essentials with dignity and privacy.' },
+            { icon: MapPin, title: 'Logistics', desc: 'Optimized routing for swift deliveries.' },
+            { icon: Bell, title: 'Updates', desc: 'Real-time SMS & Email notifications.' }
+          ].map((feature, idx) => (
+            <div key={idx} className="text-center p-6 hover:bg-white rounded-xl transition-colors duration-300">
+              <div className="w-14 h-14 mx-auto bg-blue-50 rounded-full flex items-center justify-center text-[#4567b7] mb-4">
+                <feature.icon className="w-7 h-7" />
+              </div>
+              <h3 className="font-bold text-lg mb-2">{feature.title}</h3>
+              <p className="text-gray-600">{feature.desc}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
+  const LoginPage = () => {
+    const [email, setEmail] = useState('donor@help.com');
+    const [pass, setPass] = useState('123');
+
+    return (
+      <div className="min-h-screen bg-[#f7f7f7] flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <h2 className="text-2xl font-bold text-center mb-6 text-gray-800">Welcome Back</h2>
+          
+          <div className="grid grid-cols-3 gap-3 mb-6">
+            <Button variant="outline" className="justify-center"><Facebook className="w-5 h-5 text-blue-600" /></Button>
+            <Button variant="outline" className="justify-center"><Twitter className="w-5 h-5 text-blue-400" /></Button>
+            <Button variant="outline" className="justify-center"><Github className="w-5 h-5 text-gray-800" /></Button>
+          </div>
+
+          <div className="relative mb-6">
+            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-200"></div></div>
+            <div className="relative flex justify-center text-sm"><span className="px-2 bg-white text-gray-500">Or continue with</span></div>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+              <input 
+                type="email" 
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#4567b7] focus:border-transparent outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+              <input 
+                type="password" 
+                value={pass}
+                onChange={(e) => setPass(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#4567b7] focus:border-transparent outline-none"
+              />
+            </div>
+            <div className="flex justify-between items-center text-sm">
+              <label className="flex items-center text-gray-600"><input type="checkbox" className="mr-2" /> Remember me</label>
+              <a href="#" className="text-[#4567b7] hover:underline">Forgot password?</a>
+            </div>
+            <Button onClick={() => handleLogin(email, pass)} className="w-full py-3">Log In</Button>
+          </div>
+          
+          <p className="text-center mt-6 text-sm text-gray-600">
+            Don't have an account? <button onClick={() => setCurrentPage('signup')} className="text-[#4567b7] font-bold hover:underline">Sign up</button>
+          </p>
+
+          <div className="mt-8 p-4 bg-blue-50 rounded-lg text-xs text-gray-600">
+            <p className="font-bold mb-1">Demo Credentials:</p>
+            <div className="grid grid-cols-2 gap-2">
+              <span>Admin: admin@help.com</span>
+              <span>Donor: donor@help.com</span>
+              <span>Recipient: recipient@help.com</span>
+              <span>Logistics: logistics@help.com</span>
+            </div>
+            <p className="mt-2 text-center text-gray-400">Password: 123</p>
+          </div>
+        </Card>
+      </div>
+    );
+  };
+
+  const SignupPage = () => {
+    const [step, setStep] = useState(1);
+    const [role, setRole] = useState('');
+    const [formData, setFormData] = useState({ name: '', email: '', password: '' });
+
+    const roles = [
+      { id: 'donor', title: 'Donor', icon: Heart, desc: 'I want to give.' },
+      { id: 'recipient', title: 'Recipient', icon: Users, desc: 'I need help.' },
+      { id: 'logistics', title: 'Logistics', icon: Truck, desc: 'I can deliver.' },
+      { id: 'admin', title: 'Admin', icon: LayoutDashboard, desc: 'Manage platform.' },
+    ];
+
+    return (
+      <div className="min-h-screen bg-[#f7f7f7] flex items-center justify-center p-4">
+        <Card className="w-full max-w-2xl">
+          <div className="flex justify-center mb-8">
+            <div className={`w-3 h-3 rounded-full mx-2 ${step >= 1 ? 'bg-[#4567b7]' : 'bg-gray-300'}`}></div>
+            <div className={`w-3 h-3 rounded-full mx-2 ${step >= 2 ? 'bg-[#4567b7]' : 'bg-gray-300'}`}></div>
+          </div>
+
+          {step === 1 ? (
+            <div>
+              <h2 className="text-2xl font-bold text-center mb-6">Choose your Role</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {roles.map((r) => (
+                  <button 
+                    key={r.id}
+                    onClick={() => setRole(r.id)}
+                    className={`p-6 rounded-xl border-2 text-left transition-all ${role === r.id ? 'border-[#4567b7] bg-blue-50' : 'border-gray-200 hover:border-blue-200'}`}
+                  >
+                    <r.icon className={`w-8 h-8 mb-3 ${role === r.id ? 'text-[#4567b7]' : 'text-gray-400'}`} />
+                    <h3 className="font-bold text-lg">{r.title}</h3>
+                    <p className="text-sm text-gray-500">{r.desc}</p>
+                  </button>
+                ))}
+              </div>
+              <div className="mt-8 flex justify-end">
+                <Button onClick={() => role && setStep(2)} disabled={!role} className={`${!role ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                  Next Step <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <h2 className="text-2xl font-bold text-center mb-6">Create Account</h2>
+              <div className="space-y-4 max-w-md mx-auto">
+                <input 
+                  placeholder="Full Name" 
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                  onChange={e => setFormData({...formData, name: e.target.value})}
+                />
+                <input 
+                  placeholder="Email Address" 
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                  onChange={e => setFormData({...formData, email: e.target.value})}
+                />
+                <input 
+                  type="password" 
+                  placeholder="Password" 
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                  onChange={e => setFormData({...formData, password: e.target.value})}
+                />
+                <div className="flex justify-between pt-4">
+                  <Button variant="ghost" onClick={() => setStep(1)}>Back</Button>
+                  <Button onClick={() => handleSignup({...formData, role})}>Complete Signup</Button>
+                </div>
+              </div>
+            </div>
+          )}
+        </Card>
+      </div>
+    );
+  };
+
+  // --- Dashboards ---
+
+  const DashboardLayout = ({ title, actions, children }) => (
+    <div className="min-h-screen bg-[#f7f7f7]">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-800">{title}</h1>
+            <p className="text-gray-500 mt-1">Welcome back, {user?.name}</p>
+          </div>
+          <div className="flex gap-3">
+            {actions}
+          </div>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+
+  const DonorDashboard = () => (
+    <DashboardLayout 
+      title="Donor Dashboard" 
+      actions={<Button><Plus className="w-4 h-4" /> New Donation</Button>}
+    >
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 space-y-8">
+          {/* Active Drives */}
+          <section>
+            <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Heart className="w-5 h-5 text-[#4567b7]" /> Active Donation Drives</h2>
+            <div className="grid gap-4">
+              {data.drives.map(drive => (
+                <Card key={drive.id} className="hover:shadow-md transition-shadow">
+                  <div className="flex justify-between items-start mb-2">
+                    <h3 className="font-bold text-lg">{drive.title}</h3>
+                    <Badge status={drive.urgency} />
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2.5 mb-2">
+                    <div className="bg-[#4567b7] h-2.5 rounded-full" style={{ width: `${(drive.current / drive.target) * 100}%` }}></div>
+                  </div>
+                  <div className="flex justify-between text-sm text-gray-600">
+                    <span>{drive.current} collected</span>
+                    <span>Goal: {drive.target}</span>
+                  </div>
+                  <div className="mt-4 flex justify-end">
+                    <Button variant="outline" className="text-sm py-1">Donate to Drive</Button>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </section>
+
+          {/* Recent History */}
+          <section>
+            <h2 className="text-xl font-bold mb-4">My Donation History</h2>
+            <Card>
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="border-b border-gray-100 text-sm text-gray-500">
+                    <th className="pb-3">Item</th>
+                    <th className="pb-3">Date</th>
+                    <th className="pb-3">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.requests.slice(0, 2).map(req => (
+                    <tr key={req.id} className="border-b border-gray-50 last:border-0">
+                      <td className="py-3 font-medium">{req.item}</td>
+                      <td className="py-3 text-sm text-gray-500">{req.date}</td>
+                      <td className="py-3"><Badge status={req.status} /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </Card>
+          </section>
+        </div>
+
+        {/* Sidebar */}
+        <div className="space-y-6">
+          <Card className="bg-blue-50 border-blue-100">
+            <h3 className="font-bold text-[#4567b7] mb-2">Did you know?</h3>
+            <p className="text-sm text-blue-800">Your last donation helped 3 families in the North District. Thank you!</p>
+          </Card>
+          <Card>
+            <h3 className="font-bold mb-4">Categories</h3>
+            <div className="flex flex-wrap gap-2">
+              {['Food', 'Medicine', 'Clothing', 'Books', 'Electronics'].map(tag => (
+                <span key={tag} className="px-3 py-1 bg-gray-100 rounded-full text-sm text-gray-600 hover:bg-gray-200 cursor-pointer">{tag}</span>
+              ))}
+            </div>
+          </Card>
+        </div>
+      </div>
+    </DashboardLayout>
+  );
+
+  const RecipientDashboard = () => (
+    <DashboardLayout 
+      title="Recipient Dashboard"
+      actions={<Button><Plus className="w-4 h-4" /> Request Item</Button>}
+    >
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Main Feed */}
+        <div className="lg:col-span-2">
+          <Card className="mb-8">
+            <h2 className="text-lg font-bold mb-4">Track My Requests</h2>
+            <div className="space-y-6">
+              {data.requests.map(req => (
+                <div key={req.id} className="flex items-center justify-between p-4 border rounded-lg bg-gray-50">
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm">
+                      <Package className="w-5 h-5 text-gray-500" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold">{req.item}</h4>
+                      <p className="text-xs text-gray-500">Requested on {req.date}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <Badge status={req.status} />
+                    {req.status === 'Delivered' && (
+                      <button className="block text-xs text-[#4567b7] mt-1 hover:underline">Leave Feedback</button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
+        
+        {/* Sidebar */}
+        <div>
+           <Card className="bg-green-50 border-green-100 mb-6">
+              <h3 className="font-bold text-green-800 mb-2">Available Essentials</h3>
+              <p className="text-sm text-green-700 mb-4">Food packs are currently available for immediate dispatch in your area.</p>
+              <Button variant="outline" className="w-full bg-white text-green-700 border-green-200">View Catalog</Button>
+           </Card>
+        </div>
+      </div>
+    </DashboardLayout>
+  );
+
+  const LogisticsDashboard = () => (
+    <DashboardLayout title="Logistics Center">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[600px]">
+        {/* Task List */}
+        <div className="lg:col-span-1 overflow-y-auto pr-2 space-y-4">
+          <h3 className="font-bold text-gray-500 text-sm uppercase tracking-wider">Pending Deliveries</h3>
+          {data.requests.filter(r => r.status !== 'Delivered').map(req => (
+            <Card key={req.id} className="cursor-pointer hover:border-[#4567b7] transition-colors group">
+              <div className="flex justify-between items-start">
+                <h4 className="font-bold group-hover:text-[#4567b7]">{req.item}</h4>
+                <span className="text-xs font-mono bg-gray-100 px-1 rounded">ID: #{req.id}</span>
+              </div>
+              <p className="text-sm text-gray-600 mt-1"><MapPin className="w-3 h-3 inline mr-1" /> 123 Main St, Sector 4</p>
+              <div className="mt-3 flex gap-2">
+                <Button variant="outline" className="text-xs py-1 h-8">View Route</Button>
+                <Button className="text-xs py-1 h-8">Mark Delivered</Button>
+              </div>
+            </Card>
+          ))}
+        </div>
+
+        {/* Map View */}
+        <div className="lg:col-span-2 bg-gray-200 rounded-xl overflow-hidden relative shadow-inner border border-gray-300">
+           {/* Visual Map Mockup using SVG */}
+           <svg className="w-full h-full bg-[#e5e7eb]" viewBox="0 0 800 600">
+              <rect width="800" height="600" fill="#f0f4f8" />
+              {/* Roads */}
+              <path d="M100 100 L 700 100" stroke="white" strokeWidth="15" />
+              <path d="M400 0 L 400 600" stroke="white" strokeWidth="15" />
+              <path d="M100 100 L 400 400 L 700 100" stroke="white" strokeWidth="10" strokeDasharray="10,5" />
+              
+              {/* Landmarks */}
+              <circle cx="400" cy="300" r="50" fill="#cbd5e1" opacity="0.5" />
+              
+              {/* Delivery Points */}
+              <g transform="translate(380, 280)">
+                 <circle r="10" fill="#4567b7" className="animate-pulse" />
+                 <circle r="20" fill="#4567b7" opacity="0.3" className="animate-ping" />
+                 <text y="-20" x="-20" fontFamily="sans-serif" fontSize="12" fontWeight="bold" fill="#333">Hub</text>
+              </g>
+              
+              <g transform="translate(150, 150)">
+                 <circle r="6" fill="#ef4444" />
+                 <text y="20" x="-20" fontFamily="sans-serif" fontSize="10" fill="#666">Delivery #102</text>
+              </g>
+
+              <g transform="translate(600, 200)">
+                 <circle r="6" fill="#ef4444" />
+                 <text y="20" x="-20" fontFamily="sans-serif" fontSize="10" fill="#666">Delivery #105</text>
+              </g>
+           </svg>
+           
+           <div className="absolute top-4 right-4 bg-white p-3 rounded-lg shadow-lg">
+             <h4 className="font-bold text-sm mb-2">Route Optimization</h4>
+             <div className="flex items-center text-xs gap-2 mb-1">
+               <div className="w-2 h-2 rounded-full bg-[#4567b7]"></div> <span>Hub</span>
+             </div>
+             <div className="flex items-center text-xs gap-2">
+               <div className="w-2 h-2 rounded-full bg-red-500"></div> <span>Pending</span>
+             </div>
+           </div>
+        </div>
+      </div>
+    </DashboardLayout>
+  );
+
+  const AdminDashboard = () => (
+    <DashboardLayout title="Admin Overview">
+       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <Card className="bg-blue-600 text-white border-none">
+             <h3 className="text-blue-100 text-sm font-medium">Total Donations</h3>
+             <p className="text-3xl font-bold mt-1">1,245</p>
+          </Card>
+          <Card>
+             <h3 className="text-gray-500 text-sm font-medium">Pending Requests</h3>
+             <p className="text-3xl font-bold mt-1 text-gray-800">45</p>
+          </Card>
+          <Card>
+             <h3 className="text-gray-500 text-sm font-medium">Active Users</h3>
+             <p className="text-3xl font-bold mt-1 text-gray-800">892</p>
+          </Card>
+          <Card>
+             <h3 className="text-gray-500 text-sm font-medium">Avg Delivery Time</h3>
+             <p className="text-3xl font-bold mt-1 text-gray-800">2.4 <span className="text-sm font-normal text-gray-400">days</span></p>
+          </Card>
+       </div>
+
+       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <Card>
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="font-bold text-lg">Manage Donation Drives</h3>
+              <Button variant="outline" className="text-sm">View All</Button>
+            </div>
+            <div className="space-y-4">
+              {data.drives.map(drive => (
+                <div key={drive.id} className="flex items-center justify-between p-3 border rounded-lg">
+                   <div>
+                     <p className="font-bold">{drive.title}</p>
+                     <p className="text-xs text-gray-500">{drive.category}</p>
+                   </div>
+                   <div className="flex items-center gap-2">
+                      <Badge status={drive.urgency} />
+                      <button className="text-gray-400 hover:text-red-500"><X className="w-4 h-4" /></button>
+                   </div>
+                </div>
+              ))}
+              <Button variant="secondary" className="w-full border-dashed border-2">+ Create New Drive</Button>
+            </div>
+          </Card>
+
+          <Card>
+            <h3 className="font-bold text-lg mb-6">Recent System Logs</h3>
+            <div className="space-y-4">
+               {[
+                 { msg: 'New user registration (Donor)', time: '2 mins ago', color: 'bg-green-500' },
+                 { msg: 'System Alert: High traffic', time: '15 mins ago', color: 'bg-yellow-500' },
+                 { msg: 'Database backup completed', time: '1 hour ago', color: 'bg-blue-500' }
+               ].map((log, i) => (
+                 <div key={i} className="flex items-center gap-3 text-sm">
+                   <div className={`w-2 h-2 rounded-full ${log.color}`}></div>
+                   <span className="flex-1 text-gray-700">{log.msg}</span>
+                   <span className="text-gray-400 text-xs">{log.time}</span>
+                 </div>
+               ))}
+            </div>
+          </Card>
+       </div>
+    </DashboardLayout>
+  );
+
+  // --- Rendering Logic ---
+
+  return (
+    <div className="font-sans text-gray-900 bg-[#f7f7f7] min-h-screen flex flex-col">
+      <Navbar />
+      
+      <main className="flex-grow">
+        {currentPage === 'home' && <LandingPage />}
+        {currentPage === 'about' && (
+           <div className="max-w-4xl mx-auto p-8 text-center">
+             <h1 className="text-4xl font-bold mb-4">About HelpHands</h1>
+             <p className="text-lg text-gray-600">We are a non-profit dedicated to bridging the gap between abundance and need through technology.</p>
+           </div>
+        )}
+        {currentPage === 'login' && <LoginPage />}
+        {currentPage === 'signup' && <SignupPage />}
+        
+        {currentPage === 'dashboard-donor' && <DonorDashboard />}
+        {currentPage === 'dashboard-recipient' && <RecipientDashboard />}
+        {currentPage === 'dashboard-logistics' && <LogisticsDashboard />}
+        {currentPage === 'dashboard-admin' && <AdminDashboard />}
+      </main>
+
+      {/* Toast Notifications */}
+      <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2">
+        {toasts.map(toast => (
+          <div key={toast.id} className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg text-white transform transition-all duration-300 ${toast.type === 'error' ? 'bg-red-500' : 'bg-gray-800'}`}>
+            {toast.type === 'success' ? <CheckCircle className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
+            <span>{toast.message}</span>
+          </div>
+        ))}
+      </div>
+
+      <footer className="bg-white border-t border-gray-200 py-12 mt-12">
+        <div className="max-w-7xl mx-auto px-4 grid grid-cols-1 md:grid-cols-4 gap-8">
+           <div>
+             <div className="flex items-center gap-2 mb-4 text-[#4567b7] font-bold text-xl">
+               <Heart className="w-6 h-6" fill="currentColor" /> HelpHands
+             </div>
+             <p className="text-gray-500 text-sm">Empowering communities through seamless donation logistics.</p>
+           </div>
+           <div>
+             <h4 className="font-bold mb-4">Platform</h4>
+             <ul className="space-y-2 text-sm text-gray-600">
+               <li><button className="hover:text-[#4567b7]">Donors</button></li>
+               <li><button className="hover:text-[#4567b7]">Logistics</button></li>
+               <li><button className="hover:text-[#4567b7]">Success Stories</button></li>
+             </ul>
+           </div>
+           <div>
+             <h4 className="font-bold mb-4">Support</h4>
+             <ul className="space-y-2 text-sm text-gray-600">
+               <li><button className="hover:text-[#4567b7]">Help Center</button></li>
+               <li><button className="hover:text-[#4567b7]">Safety Guidelines</button></li>
+               <li><button className="hover:text-[#4567b7]">Contact Us</button></li>
+             </ul>
+           </div>
+           <div>
+             <h4 className="font-bold mb-4">Subscribe</h4>
+             <div className="flex gap-2">
+               <input placeholder="Email address" className="bg-gray-100 rounded px-3 py-2 text-sm w-full outline-none focus:ring-1 focus:ring-[#4567b7]" />
+               <Button className="py-2 px-3"><ChevronRight className="w-4 h-4" /></Button>
+             </div>
+           </div>
+        </div>
+        <div className="max-w-7xl mx-auto px-4 mt-12 pt-8 border-t border-gray-100 text-center text-gray-400 text-sm">
+          © 2024 HelpHands Platform. All rights reserved.
+        </div>
+      </footer>
+    </div>
+  );
+}
